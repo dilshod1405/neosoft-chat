@@ -1,0 +1,103 @@
+# ---------------------------
+# Go build artifacts
+# ---------------------------
+/bin/
+/dist/
+/build/
+/out/
+/tmp/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.log
+
+# Module/pkg cache
+/go/pkg/
+/go/bin/
+*.prof
+
+# ---------------------------
+# Go modules
+# ---------------------------
+go.sum     # optional: leave only if you want it auto-generated
+# If you want go.sum included, remove this line
+
+# ---------------------------
+# Docker
+# ---------------------------
+/docker-data/
+/docker-volume/
+/*.tar
+*.pid
+
+# ---------------------------
+# Environment & Secrets
+# ---------------------------
+.env
+.env.*
+*.env
+*.key
+*.crt
+*.pem
+*.secret
+secrets.yml
+
+# ---------------------------
+# MongoDB
+# ---------------------------
+/data/
+/data/db/
+/dump/
+/mongo-data/
+/mongodb/
+
+# ---------------------------
+# Node / Next.js (if frontend exists)
+# ---------------------------
+node_modules/
+.npm/
+.yarn/
+.pnpm-store/
+.next/
+out/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+*.tsbuildinfo
+
+# Next.js standalone output
+/.vercel/
+/.vercel
+
+# ---------------------------
+# IDE / Editors
+# ---------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*.bak
+*.backup
+*.orig
+*.rej
+
+# ---------------------------
+# OS files
+# ---------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ---------------------------
+# Other possible logs/cache
+# ---------------------------
+*.log
+*.trace
+*.tmp
+.cache/
+coverage/

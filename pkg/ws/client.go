@@ -22,13 +22,24 @@ type Client struct {
 }
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true }, // prod’da domain bilan cheklang
+	CheckOrigin: func(r *http.Request) bool { return true }, // prod’da domain bilan cheklash kerak
 }
 
 type Deps struct {
-	Hub   *Hub
-	Auth  *auth.Client
-	Repo  *db.Repo
+	Hub  *Hub
+	Auth *auth.Client
+	Repo *db.Repo
+}
+
+// ✅ JSON error helper
+func writeJSONError(w http.ResponseWriter, code, msg string, status int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"type":    "error",
+		"code":    code,
+		"message": msg,
+	})
 }
 
 func ServeWS(d Deps) http.HandlerFunc {
@@ -40,44 +51,78 @@ func ServeWS(d Deps) http.HandlerFunc {
 		studentIDStr := q.Get("student_id") // mentor bo‘lsa kerak bo‘ladi
 
 		if token == "" || userIDStr == "" || courseIDStr == "" {
-			http.Error(w, "missing query params", http.StatusBadRequest)
+			writeJSONError(w, "missing_params", "token, user_id and course_id are required", 400)
 			return
 		}
+
 		userID, _ := strconv.ParseInt(userIDStr, 10, 64)
 		courseID, _ := strconv.ParseInt(courseIDStr, 10, 64)
 
+		// ✅ 1. Auth check
 		u, err := d.Auth.GetUser(userID, token)
 		if err != nil {
-			http.Error(w, "auth failed", http.StatusUnauthorized)
+			writeJSONError(w, "auth_failed", "Invalid or expired token", 401)
 			return
 		}
 
 		var mentorID, studentID int64
-		if u.IsMentor {
+
+		// ✅ STUDENT LOGIC
+		if !u.IsMentor {
+			studentID = userID
+
+			// ✅ Student shu kursda bormi?
+			enrolled, err := d.Auth.CheckEnrollment(courseID, studentID, token)
+			if err != nil || !enrolled {
+				writeJSONError(w, "not_enrolled", "User is not enrolled in this course", 403)
+				return
+			}
+
+			// ✅ Kurs mentori kim?
+			mentorID, err = d.Auth.GetCourse(courseID, token)
+			if err != nil || mentorID == 0 {
+				writeJSONError(w, "cannot_resolve_mentor", "Cannot find mentor for this course", 403)
+				return
+			}
+
+		} else {
+			// ✅ MENTOR LOGIC
 			if studentIDStr == "" {
-				http.Error(w, "student_id required for mentor", http.StatusBadRequest)
+				writeJSONError(w, "missing_params", "student_id required for mentor", 400)
 				return
 			}
 			studentID, _ = strconv.ParseInt(studentIDStr, 10, 64)
 			mentorID = userID
-		} else {
-			mentorID, err = d.Auth.GetCourse(courseID, token)
-			if err != nil || mentorID == 0 {
-				http.Error(w, "cannot resolve mentor", http.StatusForbidden)
+
+			// ✅ Kurs mentori aynan shu usermi?
+			courseMentorID, err := d.Auth.GetCourse(courseID, token)
+			if err != nil || courseMentorID != mentorID {
+				writeJSONError(w, "not_course_mentor", "Mentor does not own this course", 403)
 				return
 			}
-			studentID = userID
+
+			// ✅ Student shu kursni sotib olganmi?
+			enrolled, err := d.Auth.CheckEnrollment(courseID, studentID, token)
+			if err != nil || !enrolled {
+				writeJSONError(w, "student_not_enrolled", "Student is not part of this course", 403)
+				return
+			}
 		}
 
+		// ✅ 4. Conversation yaratish / olish
 		ctx := r.Context()
 		conv, err := d.Repo.GetOrCreateConversation(ctx, courseID, mentorID, studentID)
 		if err != nil {
-			http.Error(w, "conversation error", 500)
+			writeJSONError(w, "conversation_error", "Failed to open conversation", 500)
 			return
 		}
 
+		// ✅ 5. WebSocket upgrade
 		ws, err := upgrader.Upgrade(w, r, nil)
-		if err != nil { return }
+		if err != nil {
+			writeJSONError(w, "ws_upgrade_failed", "Failed to upgrade to WebSocket", 500)
+			return
+		}
 		defer ws.Close()
 
 		c := &Client{
@@ -87,7 +132,7 @@ func ServeWS(d Deps) http.HandlerFunc {
 			convID: conv.ID,
 		}
 
-		// write pump
+		// ✅ Writer goroutine
 		go func() {
 			for msg := range c.send {
 				c.conn.SetWriteDeadline(time.Now().Add(15 * time.Second))
@@ -99,29 +144,33 @@ func ServeWS(d Deps) http.HandlerFunc {
 		d.Hub.Join(room, c)
 		defer func() { d.Hub.Leave(room, c); close(c.send) }()
 
-		// read pump
+		// ✅ Read pump
 		for {
 			c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 			_, raw, err := c.conn.ReadMessage()
-			if err != nil { return }
+			if err != nil {
+				return
+			}
 
 			var in Inbound
-			if err := json.Unmarshal(raw, &in); err != nil { continue }
-			if in.Type != "message" || in.Text == "" { continue }
+			if err := json.Unmarshal(raw, &in); err != nil || in.Type != "message" || in.Text == "" {
+				continue
+			}
 
 			msg, err := d.Repo.CreateMessage(context.Background(), c.convID, c.userID, in.Text)
-			if err != nil { continue }
+			if err != nil {
+				continue
+			}
 
 			out := Outbound{
-				Type: "message",
+				Type:          "message",
 				ConversationID: room,
-				SenderID: c.userID,
-				Text: msg.Text,
-				CreatedAt: msg.CreatedAt.UTC().Format(time.RFC3339),
+				SenderID:      c.userID,
+				Text:          msg.Text,
+				CreatedAt:     msg.CreatedAt.UTC().Format(time.RFC3339),
 			}
 			payload, _ := json.Marshal(out)
 
-			// senderga ham, peerga ham
 			c.send <- payload
 			d.Hub.Broadcast(room, payload, c)
 		}

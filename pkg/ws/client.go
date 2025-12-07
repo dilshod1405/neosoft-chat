@@ -6,8 +6,9 @@ import (
 )
 
 type Client struct {
-	conn *websocket.Conn
-	send chan []byte
+	conn   *websocket.Conn
+	send   chan []byte
 	userID int64
 	convID primitive.ObjectID
+	hub    *Hub
 }

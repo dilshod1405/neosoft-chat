@@ -8,7 +8,6 @@ A high-performance real-time chat microservice built with **Go**, **WebSocket**,
 It integrates with a Django backend for authentication and lesson validation.
 
 </div>
----
 
 ## 🚀 Features
 

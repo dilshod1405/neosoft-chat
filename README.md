@@ -205,5 +205,6 @@ ws://<host>/ws?token=<JWT>&user_id=<UID>&lesson_id=<LID>&student_id=<SID>
 - ✔ Strong mentor–student permissions model
 - ✔ Production-ready architecture
 
-
-<a href="" align=center>NeoSoft API</a>
+<div align=center>
+<a href="">NeoSoft API</a>
+</div>

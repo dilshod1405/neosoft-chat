@@ -1,3 +1,5 @@
+<div align="center">
+
 # Chat Service — Real-Time WebSocket Messaging (Go + MongoDB)
 
 ![Go Version](https://img.shields.io/badge/go-1.23-blue)
@@ -5,6 +7,7 @@
 A high-performance real-time chat microservice built with **Go**, **WebSocket**, and **MongoDB**, designed for mentor–student communication inside an educational platform.  
 It integrates with a Django backend for authentication and lesson validation.
 
+</div>
 ---
 
 ## 🚀 Features

@@ -1,4 +1,4 @@
-# 🟣 Chat Service — Real-Time WebSocket Messaging (Go + MongoDB)
+# Chat Service — Real-Time WebSocket Messaging (Go + MongoDB)
 
 ![Go Version](https://img.shields.io/badge/go-1.23-blue)
 

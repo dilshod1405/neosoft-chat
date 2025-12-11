@@ -74,7 +74,7 @@ chat-service/
 ## ▶️ Running Locally
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/chat-service
+git clone https://github.com/dilshod1405/neosoft-chat.git
 cd chat-service
 
 go mod tidy
@@ -206,3 +206,4 @@ ws://<host>/ws?token=<JWT>&user_id=<UID>&lesson_id=<LID>&student_id=<SID>
 - ✔ Production-ready architecture
 
 
+<a href="" align=center>NeoSoft API</a>

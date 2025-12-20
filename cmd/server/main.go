@@ -1,12 +1,3 @@
-// @Summary WebSocket Chat Endpoint
-// @Description Connect to real-time chat WebSocket
-// @Tags WebSocket
-// @Param token query string true "JWT Token"
-// @Param user_id query int true "User ID"
-// @Param lesson_id query int true "Lesson ID"
-// @Param student_id query int false "Student ID (mentor only)"
-// @Router /ws [get]
-
 package main
 
 import (
@@ -26,18 +17,21 @@ import (
 )
 
 func main() {
-
 	mongoURI := os.Getenv("MONGO_URI")
 	dbName := os.Getenv("MONGO_DB")
 	django := os.Getenv("DJANGO_BASE_URL")
 	port := os.Getenv("PORT")
+
+	if port == "" {
+		port = "8080"
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	repo := db.New(client.Database(dbName))
@@ -46,18 +40,35 @@ func main() {
 	hub := ws.NewHub()
 	authClient := auth.New(django)
 
-	http.HandleFunc("/ws", ws.ServeWS(ws.Deps{
+	// 🔌 WebSocket
+	http.Handle("/ws", withCORS(ws.ServeWS(ws.Deps{
 		Hub:  hub,
 		Auth: authClient,
 		Repo: repo,
-	}))
+	})))
 
-	http.HandleFunc("/messages", httpapi.GetMessages(repo))
-	http.HandleFunc("/conversations", httpapi.GetConversations(repo))
-	http.HandleFunc("/conversations/", httpapi.GetConversation(repo))
-	http.HandleFunc("/presence", httpapi.GetPresence(hub))
+	// 📦 REST API
+	http.Handle("/messages", withCORS(httpapi.GetMessages(repo)))
+	http.Handle("/conversations", withCORS(httpapi.GetConversations(repo)))
+	http.Handle("/conversations/", withCORS(httpapi.GetConversation(repo)))
+	http.Handle("/presence", withCORS(httpapi.GetPresence(hub)))
 
-
-	log.Println("Chat service running on :" + port)
+	log.Println("🚀 Chat service running on :" + port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
+}
+
+// 🌐 CORS middleware
+func withCORS(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		h.ServeHTTP(w, r)
+	})
 }

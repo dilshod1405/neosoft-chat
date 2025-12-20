@@ -43,8 +43,10 @@ jobs:
       - name: Run container (smoke test)
         run: |
           docker run -d --name edu-neosoft-ci -p 8000:8000 \
+            -e MONGO_URI="mongodb://localhost:27017/test" \
             ghcr.io/${{ github.repository }}:${{ steps.vars.outputs.tag }}
           sleep 20
+
 
       - name: Check container is running
         run: |
